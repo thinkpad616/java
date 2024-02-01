@@ -1,5 +1,11 @@
+package com.example;
+
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+// Import for Karate Apache 0.9.6
+import com.intuit.karate.http.apache.ApacheHttpClient;
 
 public class EventHandler {
 
@@ -9,13 +15,13 @@ public class EventHandler {
         this.webClient = webClient;
     }
 
-    public void handleEvents() {
-        Flux<String> events = webClient.get().uri("sse-api-url")
+    public void handleEventsAndSendPost(String sseApiUrl, String postApiUrl) {
+        Flux<String> events = webClient.get().uri(sseApiUrl)
                                         .retrieve()
                                         .bodyToFlux(String.class);
 
         events
-            .filter(event -> event.contains("ping"))  // Adapt based on actual event structure
+            .filter(event -> event.contains("ping"))
             .buffer(3)
             .flatMap(this::sendPostRequest)
             .subscribe();
