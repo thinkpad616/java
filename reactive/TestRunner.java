@@ -1,10 +1,12 @@
-package com.example;
-
 import com.intuit.karate.http.apache.ApacheHttpClient;
+import org.junit.Test;
 
 public class TestRunner {
-    public static void main(String[] args) {
+    @Test
+    public void testKarateFeature() {
+        org.apache.http.client.HttpClient httpClient = org.apache.http.impl.client.HttpClients.createDefault(); // Create Apache client directly
         ApacheHttpClient client = new ApacheHttpClient();
-        client.run("classpath:your-feature-file.feature");  // Replace with your feature file path
+        client.setHttpClient(httpClient);    // Set the Apache client
+        client.run("classpath:your-feature-file.feature");
     }
 }
