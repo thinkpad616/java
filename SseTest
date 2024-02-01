@@ -1,17 +1,32 @@
 import com.intuit.karate.junit5.Karate;
+import com.intuit.karate.http.HttpClientFactory;
+import com.intuit.karate.http.ScenarioEngine;
+import org.springframework.web.reactive.function.client.WebClient;
 
 public class SseTest {
 
-  @Karate.Test
-  Karate testSseScenario() {
-      return Karate.run("sse-test.feature").clientFactory(new MyWebClientFactory());
-  }
+    @Karate.Test
+    Karate testSseScenario() {
+        return Karate.run("sse-test.feature").clientFactory(new MyReactiveWebClientFactory());
+    }
 
-  static class MyWebClientFactory implements com.intuit.karate.http.HttpClientFactory {
-      @Override
-      public Object create(Map<String, Object> options) {
-          return WebClient.builder()
-                  .build();
-      }
-  }
+    static class MyReactiveWebClientFactory implements HttpClientFactory {
+        @Override
+        public HttpClient create(ScenarioEngine engine) {
+            // Bridge WebClient to HttpClient
+            return new HttpClient() {
+                @Override
+                public Response call(Request request) {
+                    // Use WebClient to make the request
+                    return WebClient.create().method(request.getMethod())
+                                      .uri(request.getUrl())
+                                      .headers(request::getHeaders)
+                                      .body(request.getBody())
+                                      .exchange()
+                                      .block()
+                                      .toResponse();
+                }
+            };
+        }
+    }
 }
