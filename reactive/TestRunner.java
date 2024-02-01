@@ -1,12 +1,18 @@
 import com.intuit.karate.http.apache.ApacheHttpClient;
-import org.junit.Test;
+import org.apache.http.client.HttpClient;
+import java.lang.reflect.Method;
 
 public class TestRunner {
     @Test
-    public void testKarateFeature() {
-        org.apache.http.client.HttpClient httpClient = org.apache.http.impl.client.HttpClients.createDefault(); // Create Apache client directly
+    public void testKarateFeature() throws Exception {
+        HttpClient httpClient = HttpClients.createDefault();
         ApacheHttpClient client = new ApacheHttpClient();
-        client.setHttpClient(httpClient);    // Set the Apache client
+
+        // Use reflection to access the setHttpClient method
+        Method setHttpClientMethod = ApacheHttpClient.class.getDeclaredMethod("setHttpClient", HttpClient.class);
+        setHttpClientMethod.setAccessible(true);
+        setHttpClientMethod.invoke(client, httpClient);
+
         client.run("classpath:your-feature-file.feature");
     }
 }
