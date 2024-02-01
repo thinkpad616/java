@@ -8,11 +8,8 @@ public class TestRunner {
         HttpClient httpClient = HttpClients.createDefault();
         ApacheHttpClient client = new ApacheHttpClient();
 
-        // Use reflection to access the setHttpClient method
-        Method setHttpClientMethod = ApacheHttpClient.class.getDeclaredMethod("setHttpClient", HttpClient.class);
-        setHttpClientMethod.setAccessible(true);
-        setHttpClientMethod.invoke(client, httpClient);
-
-        client.run("classpath:your-feature-file.feature");
+         Method featureMethod = ApacheHttpClient.class.getDeclaredMethod("feature", String.class);
+        featureMethod.setAccessible(true);
+        featureMethod.invoke(client, "classpath:your-feature-file.feature");
     }
 }
