@@ -1,0 +1,17 @@
+import com.intuit.karate.junit5.Karate;
+
+public class SseTest {
+
+  @Karate.Test
+  Karate testSseScenario() {
+      return Karate.run("sse-test.feature").clientFactory(new MyWebClientFactory());
+  }
+
+  static class MyWebClientFactory implements com.intuit.karate.http.HttpClientFactory {
+      @Override
+      public Object create(Map<String, Object> options) {
+          return WebClient.builder()
+                  .build();
+      }
+  }
+}
