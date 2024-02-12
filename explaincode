@@ -1,0 +1,35 @@
+public List<String> callSSEAndSDP(String sseUrl, String sdpUrl, int count, String referenceId) {
+  // Create an empty list of strings to store the messages from SSE
+  List<String> messages = new ArrayList<>();
+  // Use a web client to make a GET request to the SSE URL with the reference ID as a query parameter
+  // and receive a stream of data as a Flux of strings
+  // A Flux is a reactive type that represents a stream of zero or more data items that can be processed asynchronously
+  Flux<String> flux = client.get().uri(sseUrl + referenceId).retrieve().bodyToFlux(String.class);
+  // Call a helper method to construct a JSON string with the reference ID and other values
+  String jsonBody = getJsonBody(referenceId, customerVerificationStatus, terminateConnection, eventMessage);
+  // Subscribe to the flux on a bounded elastic scheduler, and for each data item, do the following
+  // A scheduler is a component that manages the concurrency and parallelism of the reactive operations
+  // A bounded elastic scheduler is a type of scheduler that creates new worker threads as needed, but reuses them when possible
+  flux.publishOn(Schedulers.boundedElastic()).doOnNext(data -> {
+    // Add the data item to the messages list
+    messages.add(data); 
+    // If the size of the messages list reaches the count value, do the following
+    if (messages.size() == count) {
+      // Use a web client to make a POST request to the SDP URL with the JSON string as the body
+      // and receive a response as a Mono of string
+      // A Mono is a reactive type that represents a stream of zero or one data item that can be processed asynchronously
+      Mono<String> response = client.post().uri(sdpUrl)
+          .headers()
+          .bodyValue(jsonBody)
+          .retrieve()
+          .bodyToMono(String.class);
+      // Log the response from the SDP service and block until it is completed
+      // The block method is used to wait for the completion of the reactive operation and return the result synchronously
+      response.doOnNext(resp -> log.info("callSSEAndSDP --> SDP message:: " + resp)).block();
+    }
+  // Block until the flux is completed
+  // The blockLast method is used to wait for the completion of the flux and return the last element synchronously
+  }).blockLast();
+  // Return the messages list as the output of the method
+  return messages;
+}
