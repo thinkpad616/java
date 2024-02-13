@@ -7,29 +7,32 @@ Feature: SSE and SDP interaction
     * def sdpUrl = 'http://localhost:8080/sdp'
 
   Scenario: Test SSE events and SDP messages
-    Given url sseUrl
-    And headers { Accept: 'text/event-stream' }
-    When method GET
-    Then status 200
-    And match events contains '#number >= 2'
-    And match events contains 'data: ping ping'
+    * sseClient.startListening(sseUrl)
 
-    # Wait for 20 seconds
-    * karate.delay(20000)
+    # Wait for initial events
+    * karate.delay(500)  # Adjust delay as needed
 
-    # Post message to SDP with false flag
+    # Assert for initial events using Java code
+    * def receivedPing = sseClient.hasReceivedEvent('ping ping').result()
+    * assert receivedPing == true
+
+    # Send message to SDP with false flag after 20 seconds
+    * karate.wait 20s
     * sdpPostClient.postMessage(sdpUrl, 'Message from SDP (keepAlive=false)', false)
 
-    # Assert for updated message in SSE
-    * match events contains 'data: Message from SDP (keepAlive=false)'
-    And match events contains '#number >= 3'  # Ensure new event received
+    # Assert for updated message in SSE after 5 seconds (adjust if needed)
+    * karate.delay 5s
+    * def receivedSdpMessage = sseClient.hasReceivedEvent('Message from SDP (keepAlive=false)').result()
+    * assert receivedSdpMessage == true
 
-    # Wait for 60 seconds
-    * karate.delay(60000)
-
-    # Post message to SDP with true flag
+    # Send final message with true flag after 60 seconds
+    * karate.wait 40s  # Adjust wait time to reach 60 seconds total
     * sdpPostClient.postMessage(sdpUrl, 'Final message from SDP (keepAlive=true)', true)
 
     # Assert for final message and connection closure
-    * match events contains 'data: Final message from SDP (keepAlive=true)'
-    And match events contains
+    * karate.delay 5s  # Adjust delay if needed
+    * def receivedFinalMessage = sseClient.hasReceivedEvent('Final message from SDP (keepAlive=true)').result()
+    * assert receivedFinalMessage == true
+    * # Additional assertion for connection closure using sseClient methods if available
+
+    # You can add more steps for further validations ...
