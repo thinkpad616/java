@@ -1,0 +1,48 @@
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClient;
+
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+@Component
+public class SseClient {
+
+    private WebClient webClient = WebClient.create();
+    private Flux<Event> events;
+
+    public Mono<Void> startListening(String url) {
+        events = webClient.get()
+                          .uri(url)
+                          .accept(MediaType.TEXT_EVENT_STREAM)
+                          .retrieve()
+                          .bodyToFlux(Event.class)
+                          .doOnNext(event -> logEvent(event.getData()));  // Log events if needed
+        return events.then();
+    }
+
+    public Mono<Boolean> hasReceivedEvent(String expectedData) {
+        return events.any(event -> event.getData().equals(expectedData));
+    }
+
+    // Add other methods for assertions as needed, e.g., for event duration
+
+    private void logEvent(String data) {
+        // Implement custom logging logic here
+        System.out.println("Received event: " + data);
+    }
+}
+
+@Component
+public class SdpPostClient {
+
+    private WebClient webClient = WebClient.create();
+
+    public Mono<Void> postMessage(String url, String message, boolean keepAlive) {
+        return webClient.post()
+                 .uri(url)
+                 .contentType(MediaType.APPLICATION_JSON)
+                 .bodyValue(Map.of("message", message, "keepAlive", keepAlive))
+                 .retrieve()
+                 .bodyToMono(Void.class);
+    }
+}
