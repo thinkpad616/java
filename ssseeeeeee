@@ -1,0 +1,54 @@
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
+import reactor.core.scheduler.Schedulers;
+
+// Add this import:
+import reactor.util.retry.Retry;
+
+@Service
+public class SseSdpService {
+
+    private final WebClient webClient;
+
+    public Mono<Void> callAndRespond(String sseUrl, String sdpUrl, String referenceId) {
+
+        Sinks.Many<String> sseSink = Sinks.many().unicast().onBackpressureBuffer(); // Use multi-cast Sink for possible multiple subscribers
+        Flux<String> eventFlux = sseSink.asFlux();
+
+        // Create a reactive stream of SSE events with pinging on scheduler
+        try {
+            eventFlux = sseFlux(sseUrl, referenceId)
+                .doOnNext(data -> log.info("Received SSE event: " + data))
+                .subscribeOn(Schedulers.elastic()) // Execute on separate scheduler for non-blocking pinging
+                .publishOn(Schedulers.single()) // Ensure consistent downstream events (optional)
+                .retryWhen(Retry.fixedDelay(Long.MAX_VALUE, Duration.ofSeconds(10))) // Retry with delay on errors
+                .onErrorReturn("Connection closed");
+            sseSink.emitNext("PING", Sinks.EmitFailureHandler.FAIL_FAST); // Force initial "PING" event
+        } catch (Exception e) {
+            log.error("Error creating SSE stream", e);
+            return Mono.error(e);
+        }
+
+        // Monitor events, send SDP calls, and manage SSE closure
+        return sseMonitoring(sseSink, eventFlux, sdpUrl, referenceId);
+    }
+
+    // ... (sseFlux, disposeSse methods remain the same)
+
+    private Mono<Void> sseMonitoring(Sinks.Many<String> sseSink, Flux<String> eventFlux, String sdpUrl, String referenceId) {
+        return eventFlux
+            .windowTime(Duration.ofSeconds(20)) // Default window duration
+            .concatMap(window -> window
+                .filter(this::matchesEvent) // Apply event filtering
+                .doOnNext(event -> sseSink.emitNext(event)) // Emit event to subscribers
+                .flatMap(event -> sendAndWaitForSdpResponse(event, sdpUrl, referenceId))
+            )
+            .doFinally(() -> disposeSse(sseSink, eventFlux))
+            .then();
+    }
+
+    // ... (sendAndWaitForSdpResponse, matchesEvent, getJsonBody, logAndHandleSdpError methods remain the same)
+}
