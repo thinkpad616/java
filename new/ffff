@@ -1,0 +1,35 @@
+Feature: SSE and SDP interaction
+
+  Background:
+    * def sseClient = Java.type('com.example.SseClient')
+    * def sdpPostClient = Java.type('com.example.SdpPostClient')
+    * def sseUrl = 'http://localhost:8080/sse'
+    * def sdpUrl = 'http://localhost:8080/sdp'
+
+  Scenario: Test SSE events and SDP messages
+    Given url sseUrl
+    And headers { Accept: 'text/event-stream' }
+    When method GET
+    Then status 200
+    And match events contains '#number >= 2'
+    And match events contains 'data: ping ping'
+
+    # Wait for 20 seconds
+    * karate.delay(20000)
+
+    # Post message to SDP with false flag
+    * sdpPostClient.postMessage(sdpUrl, 'Message from SDP (keepAlive=false)', false)
+
+    # Assert for updated message in SSE
+    * match events contains 'data: Message from SDP (keepAlive=false)'
+    And match events contains '#number >= 3'  # Ensure new event received
+
+    # Wait for 60 seconds
+    * karate.delay(60000)
+
+    # Post message to SDP with true flag
+    * sdpPostClient.postMessage(sdpUrl, 'Final message from SDP (keepAlive=true)', true)
+
+    # Assert for final message and connection closure
+    * match events contains 'data: Final message from SDP (keepAlive=true)'
+    And match events contains
