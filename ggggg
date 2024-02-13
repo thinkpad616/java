@@ -1,0 +1,47 @@
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
+import reactor.core.scheduler.Schedulers;
+
+@Service
+public class MyService {
+
+    private final Sinks.Many<String> sseSink = Sinks.many().unicast().onBackpressureBuffer();
+
+    public Flux<String> listenToSSEEvents(String sseUrl, String referenceId) {
+        // Set up the SSE connection
+        Flux<String> sseEvents = client.get().uri(sseUrl + referenceId)
+                .retrieve()
+                .bodyToFlux(String.class)
+                .doOnNext(sseEvent -> sseSink.tryEmitNext(sseEvent)) // Emit SSE events to the sink
+                .subscribeOn(Schedulers.boundedElastic());
+
+        // Process the events
+        sseEvents
+                .doOnNext(event -> {
+                    // Store the event based on time (you can customize this logic)
+                    log.info("Received SSE event: " + event);
+                })
+                .doOnComplete(() -> {
+                    // SSE connection closed
+                    log.info("SSE connection closed");
+                    // Perform any cleanup or termination logic here
+                    // For example, close resources or notify other components
+                })
+                .subscribe();
+
+        // Return the SSE events as a Flux
+        return sseSink.asFlux();
+    }
+
+    public Mono<String> postToSDP(String sdpUrl, boolean terminateConnection, String referenceId, String eventMessage) {
+        String jsonBody = getJsonBody(referenceId, customerVerificationStatus, terminateConnection, eventMessage);
+        return client.post().uri(sdpUrl)
+                .headers()
+                .bodyValue(jsonBody)
+                .retrieve()
+                .bodyToMono(String.class)
+                .doOnNext(resp -> log.info("SDP response: " + resp));
+    }
+}
