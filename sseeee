@@ -1,0 +1,85 @@
+@Service
+public class SseSdpService {
+
+    private final WebClient webClient;
+    private final Duration timerDuration = Duration.ofSeconds(20); // Delay before SDP call
+
+    public Mono<Void> callAndRespond(String sseUrl, String sdpUrl, String referenceId) {
+
+        Sink<String> sseSink; // Capture Sink for event monitoring
+        Flux<String> eventFlux;
+
+        // Create a reactive stream of SSE events with error handling and pinging
+        try {
+            eventFlux = sseFlux(sseUrl, referenceId)
+                .doOnNext(data -> log.info("Received SSE event: " + data))
+                .keepAlive(Duration.ofSeconds(10)) // Ping every 10 seconds
+                .onErrorReturn("Connection closed");
+            sseSink = eventFlux.sink();
+        } catch (Exception e) {
+            log.error("Error creating SSE stream", e);
+            return Mono.error(e);
+        }
+
+        // Monitor events, send SDP calls, and manage SSE closure
+        return sseMonitoring(sseSink, eventFlux, sdpUrl, referenceId);
+    }
+
+    private Flux<String> sseFlux(String sseUrl, String referenceId) {
+        return webClient.get()
+            .uri(sseUrl + referenceId)
+            .retrieve()
+            .bodyToFlux(String.class);
+    }
+
+    private Mono<Void> sseMonitoring(Sink<String> sseSink, Flux<String> eventFlux, String sdpUrl, String referenceId) {
+        return sseSink.asFlux()
+            .startWith("PING") // Force initial "PING" event
+            .windowTime(timerDuration)
+            .filter(window -> window.contains("PING")) // Ensure first event is "PING"
+            .concatWith(Mono.delay(timerDuration).then()) // Trigger SDP call after window
+            .flatMap(window -> sendAndWaitForSdpResponse(window, sdpUrl, referenceId))
+            .doFinally(() -> disposeSse(sseSink, eventFlux))
+            .then();
+    }
+
+    private Mono<Void> sendAndWaitForSdpResponse(Flux<String> events, String sdpUrl, String referenceId) {
+        // Filter for events, build JSON payloads, and send SDP requests
+        return events
+            .filter(event -> matchesEvent(event))
+            .flatMap(window -> {
+                String jsonBody = getJsonBody(referenceId, window, isTermination(window));
+                return webClient.post()
+                    .uri(sdpUrl)
+                    .headers()
+                    .bodyValue(jsonBody)
+                    .retrieve()
+                    .bodyToMono(Void.class)
+                    .doOnNext(resp -> log.info("SDP response: " + resp));
+            });
+    }
+
+    private boolean matchesEvent(String event) {
+        // Implement your logic to check for relevant events ("PING", "msg", etc.)
+        // ...
+    }
+
+    private String getJsonBody(String referenceId, Flux<String> events, boolean isTermination) {
+        // Implement your logic to build JSON based on events, referenceId, and termination flag
+        // ...
+    }
+
+    private boolean isTermination(Flux<String> events) {
+        // Implement your logic to check for a termination condition within the event window
+        // ...
+    }
+
+    private void disposeSse(Sink<String> sseSink, Flux<String> eventFlux) {
+        if (sseSink != null) {
+            sseSink.complete();
+        }
+        if (eventFlux != null) {
+            eventFlux.subscribe(disposable -> disposable.dispose());
+        }
+    }
+}
