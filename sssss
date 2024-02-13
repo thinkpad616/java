@@ -1,0 +1,80 @@
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
+
+@Service
+public class SseSdpService {
+
+    private final WebClient webClient;
+
+    public Mono<Void> callAndRespond(String sseUrl, String sdpUrl, String referenceId) {
+
+        Sinks.Many<String> sseSink = Sinks.many().unicast().onBackpressureBuffer(); // Use multi-cast Sink for possible multiple subscribers
+        Flux<String> eventFlux = sseSink.asFlux();
+
+        // Create a reactive stream of SSE events with error handling and pinging
+        try {
+            eventFlux = sseFlux(sseUrl, referenceId)
+                .doOnNext(data -> log.info("Received SSE event: " + data))
+                .keepAlive(Duration.ofSeconds(10)) // Ping every 10 seconds
+                .onErrorReturn("Connection closed");
+            sseSink.emitNext("PING", Sinks.EmitFailureHandler.FAIL_FAST); // Force initial "PING" event
+        } catch (Exception e) {
+            log.error("Error creating SSE stream", e);
+            return Mono.error(e);
+        }
+
+        // Monitor events, send SDP calls, and manage SSE closure
+        return sseMonitoring(sseSink, eventFlux, sdpUrl, referenceId);
+    }
+
+    private Flux<String> sseFlux(String sseUrl, String referenceId) {
+        return webClient.get()
+            .uri(sseUrl + referenceId)
+            .retrieve()
+            .bodyToFlux(String.class);
+    }
+
+    private Mono<Void> sseMonitoring(Sinks.Many<String> sseSink, Flux<String> eventFlux, String sdpUrl, String referenceId) {
+        return eventFlux
+            .windowTime(Duration.ofSeconds(20)) // Default window duration
+            .concatMap(window -> window
+                .filter(this::matchesEvent) // Apply event filtering
+                .doOnNext(event -> sseSink.emitNext(event)) // Emit event to subscribers
+                .flatMap(event -> sendAndWaitForSdpResponse(event, sdpUrl, referenceId))
+            )
+            .doFinally(() -> disposeSse(sseSink, eventFlux))
+            .then();
+    }
+
+    private Mono<Void> sendAndWaitForSdpResponse(String event, String sdpUrl, String referenceId) {
+        String message = extractMessage(event); // Extract message from event (if applicable)
+        boolean terminate = isTerminationRequired(event); // Check for termination flag in event (or based on other logic)
+
+        return webClient.post()
+            .uri(sdpUrl)
+            .headers()
+            .bodyValue(getJsonBody(referenceId, message, terminate))
+            .retrieve()
+            .bodyToMono(Void.class)
+            .onErrorResume(WebClientResponseException.class, e -> logAndHandleSdpError(e))
+            .thenDoOnSuccess(() -> {
+                if (terminate) {
+                    sseSink.tryEmitComplete(); // Signal completion if termination requested
+                }
+            });
+    }
+
+    // ... (matchesEvent, getJsonBody, disposeSse, logAndHandleSdpError methods remain the same)
+
+    // Implement these methods based on your specific event format and requirements:
+    private String extractMessage(String event) {
+        // ...
+    }
+
+    private boolean isTerminationRequired(String event) {
+        // ...
+    }
+}
