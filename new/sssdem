@@ -1,0 +1,17 @@
+// ... (Your existing code)
+
+// Bypass SSL certificate validation for JMeter's HTTP Request sampler
+try {
+    SSLContext sslContext = SSLContext.getInstance("TLS");
+    sslContext.init(null, trustAllCertificates, new java.security.SecureRandom());
+
+    // Set the SSL context for JMeter's HTTP Request sampler
+    HttpsURLConnection.setDefaultSSLSocketFactory(sslContext.getSocketFactory());
+
+    // Bypass hostname verification
+    HttpsURLConnection.setDefaultHostnameVerifier((hostname, session) -> true);
+} catch (Exception e) {
+    e.printStackTrace();
+}
+
+// ... (Rest of your code)
