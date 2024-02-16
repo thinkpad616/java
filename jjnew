@@ -1,0 +1,57 @@
+import org.springframework.web.reactive.socket.WebSocketMessage;
+import org.springframework.web.reactive.socket.client.ReactorNettyWebSocketClient;
+import reactor.core.publisher.Mono;
+import reactor.core.publisher.Flux;
+
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+public class WebClientEventHandler {
+
+    private final String url;
+    private final String taskId;
+    private final List<String> responses = new ArrayList<>();
+
+    public WebClientEventHandler(String url, String taskId) {
+        this.url = url;
+        this.taskId = taskId;
+    }
+
+    public List<String> getResponses() {
+        return responses;
+    }
+
+    public void connect() throws Exception {
+        ReactorNettyWebSocketClient client = new ReactorNettyWebSocketClient();
+
+        String encodedTaskId = URLEncoder.encode(URLEncoder.encode(taskId, StandardCharsets.UTF_8.name()), StandardCharsets.UTF_8.name());
+        URI uri = URI.create(url + encodedTaskId);
+
+        Flux<WebSocketMessage> messages = client.execute(uri)
+                .flatMapMany(webSocket -> webSocket.receive()
+                        .doOnNext(message -> responses.add(message.getPayloadAsText()))
+                        .then());
+
+        messages.subscribe();
+        TimeUnit.SECONDS.sleep(5); // Replace with your desired wait time
+        client.shutdown();
+    }
+
+    public static void main(String[] args) throws Exception {
+        String url = args[0];
+        String taskId = args[1];
+
+        WebClientEventHandler handler = new WebClientEventHandler(url, taskId);
+        handler.connect();
+
+        List<String> responses = handler.getResponses();
+        System.out.println("Received " + responses.size() + " events:");
+        for (String response : responses) {
+            System.out.println(response);
+        }
+    }
+}
