@@ -36,3 +36,32 @@ sleep(vars.get("duration") as long)
 
 // Close the event source
 eventSource.close()
+
+
+
+// Import statements
+import javax.net.ssl.HostnameVerifier
+import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
+
+// Create a trust manager that does not validate certificate chains
+def nullTrustManager = [
+  checkClientTrusted: { chain, authType -> },
+  checkServerTrusted: { chain, authType -> },
+  getAcceptedIssuers: { null }
+]
+
+// Create a hostname verifier that always returns true
+def nullHostnameVerifier = [
+  verify: { hostname, session -> true }
+]
+
+// Install the null trust manager and hostname verifier
+SSLContext sc = SSLContext.getInstance("SSL")
+sc.init(null, [nullTrustManager as X509TrustManager] as TrustManager[], null)
+HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory())
+HttpsURLConnection.setDefaultHostnameVerifier(nullHostnameVerifier as HostnameVerifier)
+
+
