@@ -1,0 +1,76 @@
+/* Import required libraries */
+import org.springframework.web.reactive.socket.WebSocketMessage;
+import org.springframework.web.reactive.socket.client.ReactorNettyWebSocketClient;
+import reactor.core.publisher.Mono;
+import reactor.core.publisher.Flux;
+
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+/* Define custom class for SSE event handling */
+public class WebClientEventHandler {
+
+    private final String url;
+    private final String taskId;
+    private final List<String> responses = new ArrayList<>();
+
+    public WebClientEventHandler(String url, String taskId) {
+        this.url = url;
+        this.taskId = taskId;
+    }
+
+    public List<String> getResponses() {
+        return responses;
+    }
+
+    public void connect() throws Exception {
+        ReactorNettyWebSocketClient client = new ReactorNettyWebSocketClient();
+
+        String encodedTaskId = URLEncoder.encode(URLEncoder.encode(taskId, StandardCharsets.UTF_8.name()), StandardCharsets.UTF_8.name());
+        URI uri = URI.create(url + encodedTaskId);
+
+        Flux<WebSocketMessage> messages = client.execute(uri)
+                .flatMapMany(webSocket -> webSocket.receive()
+                        .doOnNext(message -> responses.add(message.getPayloadAsText()))
+                        .then());
+
+        messages.subscribe();
+        TimeUnit.SECONDS.sleep(5); // Replace with your desired wait time
+        client.shutdown();
+    }
+}
+
+/* JMeter Script with comments */
+
+/* Retrieve URL and task ID from JMeter variables */
+String url = vars.get("url");
+String taskId = vars.get("taskId");
+
+/* Create an event handler object */
+WebClientEventHandler handler = new WebClientEventHandler(url, taskId);
+
+/* Connect to the SSE endpoint and handle exceptions */
+try {
+    handler.connect();
+} catch (Exception e) {
+    log.error("Failed to connect:", e);
+    // Set appropriate JMeter response based on the error
+    return;
+}
+
+/* Access received event data */
+List<String> responses = handler.getResponses();
+
+/* Combine responses into a single string (optional, adjust based on your needs) */
+String combinedResponses = String.join("|", responses);
+
+/* Set JMeter response data and code */
+vars.put("responseData", combinedResponses);
+vars.put("responseCode", "200"); // Replace with appropriate code if needed
+
+/* Additional logging or processing here (optional) */
+
