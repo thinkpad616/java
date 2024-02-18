@@ -1,0 +1,68 @@
+// Import necessary classes
+import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.http.codec.ServerSentEvent
+import org.springframework.core.ParameterizedTypeReference
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
+import reactor.util.retry.Retry
+import org.slf4j.LoggerFactory
+
+// Initialize logger
+def log = LoggerFactory.getLogger("SSESampler")
+
+// Define SSE endpoint URL
+def sseEndpoint = "http://example.com/sse_endpoint"
+
+// Create a WebClient instance
+def webClient = WebClient.builder().baseUrl(sseEndpoint).build()
+
+// Create a parameterized type reference for ServerSentEvent
+def sseType = new ParameterizedTypeReference<ServerSentEvent<String>>() {}
+
+// Create a Flux to receive SSE events
+def sseFlux = webClient.get()
+                      .uri("/")
+                      .retrieve()
+                      .bodyToFlux(sseType)
+
+// Subscribe to SSE events
+sseFlux.subscribe(
+    // On next event
+    { event ->
+        // Log received message event
+        log.info("Received message: {}", event.data())
+    },
+    // On error
+    { error ->
+        // Log error
+        log.error("Error occurred: {}", error)
+    },
+    // On completion
+    {
+        // Log SSE connection closed
+        log.info("SSE connection closed.")
+    }
+)
+
+// Wait indefinitely
+Thread.sleep(Long.MAX_VALUE)
+
+
+
+
+
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-webflux</artifactId>
+    <version>2.6.4</version> <!-- Use the appropriate version -->
+</dependency>
+<dependency>
+    <groupId>org.slf4j</groupId>
+    <artifactId>slf4j-api</artifactId>
+    <version>1.7.32</version> <!-- Use the appropriate version -->
+</dependency>
+<dependency>
+    <groupId>org.slf4j</groupId>
+    <artifactId>slf4j-simple</artifactId>
+    <version>1.7.32</version> <!-- Use the appropriate version -->
+</dependency>
