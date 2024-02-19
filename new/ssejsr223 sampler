@@ -1,0 +1,49 @@
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.sse.EventSource
+import okhttp3.sse.EventSourceListener
+
+// Replace with your actual SSE endpoint URL
+def sseUrl = "http://your-sse-endpoint"
+
+// Create an OkHttpClient instance
+def client = new OkHttpClient()
+
+// Create an EventSource object
+def eventSource = new EventSource(client, new Request.Builder().url(sseUrl).build())
+
+// Event handler to process incoming events
+def eventHandler = new EventSourceListener() {
+    @Override
+    void onOpen(EventSource eventSource, Response response) {
+        log.info("SSE connection opened: ${response.code}")
+    }
+
+    @Override
+    void onMessage(EventSource eventSource, String id, String type, String data) {
+        log.info("Received event: id=${id}, type=${type}, data=${data}")
+        // Process the event data as needed
+    }
+
+    @Override
+    void onClosed(EventSource eventSource) {
+        log.info("SSE connection closed")
+    }
+
+    @Override
+    void onFailure(EventSource eventSource, Throwable t, Response response) {
+        log.error("SSE error: ${t.message}", t)
+        // Handle errors appropriately
+    }
+}
+
+// Add the event handler to the EventSource
+eventSource.register(eventHandler)
+
+// Start listening for events
+eventSource.start()
+
+// Do other JMeter actions here
+
+// Close the SSE connection when finished
+eventSource.cancel()
