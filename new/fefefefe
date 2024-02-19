@@ -2,40 +2,35 @@ import com.launchdarkly.eventsource.EventSource;
 import com.launchdarkly.eventsource.EventHandler;
 import com.launchdarkly.eventsource.MessageEvent;
 
-public class SSEExample {
-    public static void main(String[] args) {
-        // Set up your SSE endpoint URL
-        String sseUrl = "https://your-sse-service.com/events";
+// Define the SSE URL
+String sseUrl = "https://your-sse-endpoint.com/events";
 
-        // Create an EventSource instance
-        EventSource eventSource = new EventSource.Builder(new EventHandler() {
-            @Override
-            public void onOpen() {
-                System.out.println("SSE connection opened");
-            }
-
-            @Override
-            public void onMessage(String event, MessageEvent messageEvent) {
-                // Handle SSE events here
-                System.out.println("Received event: " + messageEvent.getData());
-                // Add your custom logic for processing events
-            }
-
-            @Override
-            public void onError(Throwable t) {
-                // Handle connection errors
-                System.err.println("SSE connection error: " + t.getMessage());
-            }
-        }).url(sseUrl).build();
-
-        // Start the SSE connection
-        eventSource.start();
-
-        // Wait for events (this will run indefinitely during load testing)
-        try {
-            Thread.sleep(60000); // Adjust as needed
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+// Create an EventSource instance
+EventSource eventSource = new EventSource.Builder(new EventHandler() {
+    @Override
+    public void onOpen() {
+        log.info("SSE connection opened");
     }
-}
+
+    @Override
+    public void onMessage(String event, MessageEvent messageEvent) {
+        // Handle SSE messages here
+        log.info("Received SSE message: " + messageEvent.getData());
+    }
+
+    @Override
+    public void onError(Throwable t) {
+        log.error("Error in SSE connection: " + t.getMessage());
+    }
+})
+.uri(sseUrl)
+.build();
+
+// Start the SSE connection
+eventSource.start();
+
+// Wait for some time (you can adjust this based on your scenario)
+Thread.sleep(10000);
+
+// Close the SSE connection
+eventSource.close();
