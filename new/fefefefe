@@ -1,47 +1,31 @@
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
-import okhttp3.sse.EventSource;
-import okhttp3.sse.EventSources;
+import com.launchdarkly.eventsource.EventSource
+import com.launchdarkly.eventsource.EventHandler
+import com.launchdarkly.eventsource.MessageEvent
 
-// Define your SSE endpoint URL
-String sseUrl = "https://example.com/sse-endpoint";
+// Your custom logic here to handle SSE events
+def eventHandler = new EventHandler() {
+    void onOpen(EventSource eventSource) {
+        // Handle connection open
+    }
 
-// Create an OkHttpClient
-OkHttpClient client = new OkHttpClient();
+    void onMessage(String event, MessageEvent messageEvent) {
+        // Handle incoming SSE message
+        log.info("Received SSE message: " + messageEvent.data)
+    }
 
-// Create an SSE request
-Request request = new Request.Builder()
-        .url(sseUrl)
-        .build();
+    void onError(Throwable t) {
+        // Handle errors
+    }
 
-// Set up the EventSource
-EventSource eventSource = EventSources.createFactory(client)
-        .newEventSource(request, new EventSourceListener() {
-            @Override
-            public void onEvent(EventSource eventSource, String id, String type, String data) {
-                // Handle SSE events here
-                log.info("Received SSE event: ID={}, Type={}, Data={}", id, type, data);
-                // Add your custom logic to process the data
-            }
+    void onClosed(EventSource eventSource) {
+        // Handle connection closed
+    }
+}
 
-            @Override
-            public void onFailure(EventSource eventSource, Throwable t, Response response) {
-                // Handle failure (e.g., connection closed, errors)
-                log.error("SSE connection failed: {}", t.getMessage());
-            }
-        });
+// Initialize EventSource with your SSE endpoint
+def eventSource = new EventSource.Builder("your_sse_endpoint")
+    .eventHandler(eventHandler)
+    .build()
 
 // Start listening to SSE events
-eventSource.start();
-
-// Wait for some time (e.g., simulate a test duration)
-// You can adjust this based on your test scenario
-Thread.sleep(60000); // Wait for 60 seconds
-
-// Clean up and close the EventSource
-eventSource.close();
-
-
-
-Make sure you’ve added the okhttp-eventsource library (compatible with OkHttp 4.x) to JMeter’s classpath. This code snippet should work seamlessly with Java 17 and JMeter. Happy testing! 
+eventSource.start()
