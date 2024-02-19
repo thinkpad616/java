@@ -1,31 +1,41 @@
-import com.launchdarkly.eventsource.EventSource
-import com.launchdarkly.eventsource.EventHandler
-import com.launchdarkly.eventsource.MessageEvent
+import com.launchdarkly.eventsource.EventSource;
+import com.launchdarkly.eventsource.EventHandler;
+import com.launchdarkly.eventsource.MessageEvent;
 
-// Your custom logic here to handle SSE events
-def eventHandler = new EventHandler() {
-    void onOpen(EventSource eventSource) {
-        // Handle connection open
-    }
+public class SSEExample {
+    public static void main(String[] args) {
+        // Set up your SSE endpoint URL
+        String sseUrl = "https://your-sse-service.com/events";
 
-    void onMessage(String event, MessageEvent messageEvent) {
-        // Handle incoming SSE message
-        log.info("Received SSE message: " + messageEvent.data)
-    }
+        // Create an EventSource instance
+        EventSource eventSource = new EventSource.Builder(new EventHandler() {
+            @Override
+            public void onOpen() {
+                System.out.println("SSE connection opened");
+            }
 
-    void onError(Throwable t) {
-        // Handle errors
-    }
+            @Override
+            public void onMessage(String event, MessageEvent messageEvent) {
+                // Handle SSE events here
+                System.out.println("Received event: " + messageEvent.getData());
+                // Add your custom logic for processing events
+            }
 
-    void onClosed(EventSource eventSource) {
-        // Handle connection closed
+            @Override
+            public void onError(Throwable t) {
+                // Handle connection errors
+                System.err.println("SSE connection error: " + t.getMessage());
+            }
+        }).url(sseUrl).build();
+
+        // Start the SSE connection
+        eventSource.start();
+
+        // Wait for events (this will run indefinitely during load testing)
+        try {
+            Thread.sleep(60000); // Adjust as needed
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 }
-
-// Initialize EventSource with your SSE endpoint
-def eventSource = new EventSource.Builder("your_sse_endpoint")
-    .eventHandler(eventHandler)
-    .build()
-
-// Start listening to SSE events
-eventSource.start()
