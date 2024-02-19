@@ -41,3 +41,7 @@ Thread.sleep(60000); // Wait for 60 seconds
 
 // Clean up and close the EventSource
 eventSource.close();
+
+
+
+Make sure you’ve added the okhttp-eventsource library (compatible with OkHttp 4.x) to JMeter’s classpath. This code snippet should work seamlessly with Java 17 and JMeter. Happy testing! 
