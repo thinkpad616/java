@@ -1,0 +1,102 @@
+public class SimpleEventHandler implements EventHandler {
+
+    public SimpleEventHandler(org.slf4j.Logger log){
+        this.log=log;
+    }
+
+    def Object monitor = new Object();
+
+    public List<String> respList = new ArrayList<String>();
+    def org.slf4j.Logger log
+    public boolean closedByUser = false; // add this field
+
+    public void onOpen() throws Exception{
+        log.info("SSE Connection Opened");
+    }
+
+    public void onClosed() throws Exception{
+        log.info("***************************************");
+        log.info("**********************");
+        log.info("SSE Connection CLosed");
+        log.info("**********************");
+        log.info("****************************************");
+        if (!closedByUser) { // add this condition
+            synchronized (monitor) {
+                monitor.notify();
+            }
+        }
+    }
+
+    public void onMessage(String Event, MessageEvent messageEvent) throws Exception{
+        respList.add(messageEvent.getData());
+        log.info("Received: "+ messageEvent.getData() );
+    }
+
+    public void onComment(String comment) throws Exception{
+        log.info(comment);
+    }
+
+    public void onError(Throwable t){
+        log.info("Error "+t);
+    }
+}
+
+EventHandler eH = new SimpleEventHandler(log);
+    eH.log=log;
+    String responseList="";
+
+    String bpnsProtocol = args[0];
+    String bpnsHost = args[1];
+    String bpnsPath = args[2];    
+    String serviceName = args[3];
+    String taskID = args[4];
+    String keepSseAlive = args[5];
+
+String encodedTaskId = URLEncoder.encode(URLEncoder.encode(args[4], StandardCharsets.UTF_8.name()), StandardCharsets.UTF_8.name());
+    log.info(">>>>> EncodedTaskId: " + encodedTaskId + " >>>>>");
+    String url = bpnsProtocol + bpnsHost + bpnsPath + serviceName + encodedTaskId;
+    log.info(">>>>> url:  " + url + " >>>>>");
+    log.info(">>>>> Started Polling >>>>>");
+
+    EventSource.Builder builder = new EventSource.Builder(eH, URI.create(url));
+
+    //EventSource eventSource = builder.connectTimeout(Duration.ofSeconds(Integer.parseInt(args[1]))).build();
+
+    builder.connectionErrorHandler(new ConnectionErrorHandler() {
+
+                    public Action onConnectionError(Throwable t) {
+                        return Action.SHUTDOWN;
+                    }
+                });
+
+EventSource eventSource = builder.build();
+
+    eventSource.start();
+
+    // add this method to handle connection errors
+    eventSource.onerror = function(event) {
+        // check if the connection was closed by the server
+        if (event.eventPhase == EventSource.CLOSED) {
+            // set the flag to true and close the connection
+            eH.closedByUser = true;
+            eventSource.close();
+            log.info("Connection closed by the server");
+        }
+    };
+
+    synchronized (eH.monitor) {
+        eH.monitor.wait();
+    }
+
+    TimeUnit.SECONDS.sleep(Integer.parseInt(args[5]));
+
+    eH.closedByUser = true; // add this line
+    eventSource.close();
+
+    for(String respRecord:eH.respList){
+        responseList = responseList +"|"+ respRecord;
+    }
+
+    log.info("Received total "+ eH.respList.size +"Events");
+
+    SampleResult.setResponseData(responseList,"866");
