@@ -1,0 +1,82 @@
+import com.launchdarkly.eventsource.EventSource;
+import com.launchdarkly.eventsource.EventHandler;
+import com.launchdarkly.eventsource.MessageEvent;
+import java.net.URI;
+import java.util.concurrent.TimeUnit;
+import java.util.ArrayList;
+import org.apache.jmeter.util.JMeterUtils
+
+public class SimpleEventHandler implements EventHandler {
+
+    private EventSource eventSource;
+    private int receivedEvents = 0;
+    private boolean shouldReconnect = true; // Flag to control reconnection
+    private org.slf4j.Logger log;
+
+    public SimpleEventHandler(org.slf4j.Logger log) {
+                this.log = log;
+
+        // Extract arguments (adjust as needed)
+        String[] args = /* Get arguments from your JMeter test plan */;
+        String bpnsProtocol = args[0];
+        String bpnsHost = args[1];
+        String bpnsPath = args[2];
+        String serviceName = args[3];
+        String taskID = args[4];
+        String keepSseAlive = args[5];
+
+        String encodedTaskId = URLEncoder.encode(URLEncoder.encode(taskID, StandardCharsets.UTF_8.name()), StandardCharsets.UTF_8.name());
+        String url = bpnsProtocol + bpnsHost + bpnsPath + serviceName + encodedTaskId;
+
+        log.info("EncodedTaskId: " + encodedTaskId);
+        log.info("URL: " + url);
+        log.info("Started Polling");
+
+        eventSource = new EventSource.Builder(this, URI.create(url)).build();
+    }
+
+    public void onOpen() throws Exception {
+        eventSource.start();
+        log.info("SSE Connection Opened");
+    }
+
+    public void onClosed() throws Exception {
+        int closeReason = eventSource.getCloseReason();
+        log.info("SSE Connection Closed");
+        log.info("SSE connection closed with reason: " + closeReason);
+        log.info("Total received events: " + receivedEvents);
+
+        if (closeReason == 1005 || !shouldReconnect) { // Stop reconnecting if server terminates or flag is set
+            JMeterUtils.getEngine().stop();
+        } else {
+            // Retry connection with a delay
+            eventSource.start(Duration.ofSeconds(5));
+        }
+    }
+
+    public void onMessage(String event, MessageEvent messageEvent) throws Exception {
+        receivedEvents++;
+        log.info("Received: " + messageEvent.getData());
+    }
+
+    public void onComment(String comment) throws Exception {
+        log.info(comment);
+    }
+
+    public void onError(Throwable t) {
+        log.info("Error " + t);
+    }
+
+    // Additional method to stop reconnection attempts
+    public void stopReconnecting() {
+        shouldReconnect = false;
+        eventSource.close();
+    }
+}
+
+// Create and start the event handler
+EventHandler eH = new SimpleEventHandler(log);
+eH.eventSource.start();
+
+// To stop reconnection later (if needed):
+// eH.stopReconnecting();
