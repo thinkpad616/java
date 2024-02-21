@@ -1,0 +1,42 @@
+import com.launchdarkly.eventsource.EventSource
+import com.launchdarkly.eventsource.EventHandler
+
+def url = 'YOUR_SSE_URL_HERE'
+
+def eventHandler = new EventHandler() {
+    @Override
+    void onOpen() {
+        System.out.println('Connection opened')
+    }
+
+    @Override
+    void onMessage(String event, String data) {
+        System.out.println('Received event: ' + event + ', data: ' + data)
+        // Add your logic to process SSE events here
+    }
+
+    @Override
+    void onError(Throwable t) {
+        System.err.println('Error occurred: ' + t.message)
+        t.printStackTrace(System.err)
+    }
+
+    @Override
+    void onClosed(boolean willReconnect) {
+        System.out.println('Connection closed, will reconnect: ' + willReconnect)
+        if (!willReconnect) {
+            SampleResult.setStopTestNow(true)
+        }
+    }
+}
+
+def eventSource = new EventSource.Builder(eventHandler, url).build()
+eventSource.start()
+
+// Wait for the test to end
+while (!SampleResult.getStopTest()) {
+    Thread.sleep(1000)
+}
+
+// Clean up
+eventSource.close()
