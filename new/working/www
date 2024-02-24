@@ -1,0 +1,47 @@
+import com.launchdarkly.eventsource.*;
+
+// Replace with your LaunchDarkly project and stream key
+String projectKey = "your_project_key";
+String streamKey = "your_stream_key";
+
+// Initialize variables
+int pingCount = 0;
+org.apache.jmeter.control.LoopController whileLoopController = sampler.getThreadContext().getController().next().getController(0); // Get a reference to the While Loop
+
+// Create EventSource
+EventSource eventSource = EventSource.Builder.create(projectKey, streamKey)
+    .onError(new ErrorHandler() {
+        @Override
+        public void onError(ConnectError e) {
+            log.error("Error connecting to SSE: " + e.getMessage());
+        }
+        @Override
+        public void onOpen(OpenEvent e) {
+            log.info("SSE connection opened");
+        }
+        @Override
+        public void onMessage(MessageEvent e) {
+            // Process SSE events
+            String data = e.getData();
+            if (data.startsWith("ping")) {
+                pingCount++;
+                log.info("Received ping: " + pingCount);
+                if (pingCount >= 5) {
+                    whileLoopController.setRunningVersion(true); // Start the While Loop
+                }
+            } else {
+                // Process other SSE events if needed
+            }
+        }
+    })
+    .build();
+
+// Start EventSource and wait for 5 pings
+eventSource.start();
+eventSource.awaitOpen(); // Wait for connection to open
+while (pingCount < 5) {
+    Thread.sleep(100); // Add a delay to avoid busy waiting
+}
+
+// Close EventSource
+eventSource.close();
