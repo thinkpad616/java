@@ -1,0 +1,21 @@
+import org.apache.jmeter.control.WhileController
+import org.apache.jmeter.engine.StandardJMeterEngine
+import org.apache.jmeter.engine.TreeCloner
+import org.apache.jmeter.engine.TreeClonerNoTimer
+import org.apache.jmeter.engine.TreeClonerWithTimer
+import org.apache.jmeter.samplers.Sampler
+import org.apache.jmeter.testelement.TestElement
+import org.apache.jmeter.testelement.TestPlan
+import org.apache.jmeter.threads.JMeterContextService
+import org.apache.jmeter.threads.JMeterVariables
+import org.apache.jmeter.util.JMeterUtils
+
+// Get the Test Plan
+def testPlan = ctx.getEngine().getTestPlan()
+
+// Find the While Controller within the Parallel Controller
+def parallelController = ctx.getCurrentSampler().getProperty("Parent").getObjectValue()
+def whileController = parallelController.subControllers.find { it instanceof WhileController }
+
+// Start the While Controller's loop
+whileController.startNextLoop(true)
