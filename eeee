@@ -1,0 +1,122 @@
+import com.launchdarkly.eventsource.EventSource;
+import com.launchdarkly.eventsource.ConnectionErrorHandler;
+import com.launchdarkly.eventsource.EventHandler;
+import com.launchdarkly.eventsource.MessageEvent;
+import okhttp3.OkHttpClient;
+import com.launchdarkly.eventsource.ReadyState;
+import java.net.URI;
+import java.io.StringReader;
+import java.util.concurrent.TimeUnit;
+import java.util.ArrayList;
+import java.time.Duration;
+import java.nio.charset.StandardCharsets;
+import java.net.*;
+import com.launchdarkly.eventsource.ConnectionErrorHandler.Action;
+import org.slf4j.Logger;
+
+// Renamed the class to follow Java naming conventions
+public class SimpleEventHandler implements EventHandler {
+    private Logger log; // Changed to private
+
+    // Renamed the constructor to match the class name
+    public SimpleEventHandler(Logger log){
+        this.log = log;
+    }
+
+    public List<String> respList = new ArrayList<String>();
+
+    public void onOpen() throws Exception{
+        log.info("SSE Connection Opened");
+    }
+
+    public void onClosed() throws Exception{
+        log.info("SSE Connection Closed");
+    }
+
+    public void onMessage(String Event, MessageEvent messageEvent) throws Exception{
+        respList.add(messageEvent.getData());
+        log.info("Received: "+ messageEvent.getData());
+
+        // Check if we have received 5 pings
+        if (respList.size() % 5 == 0) {
+            // Create a new thread to send a parallel request
+            Thread postThread = new Thread(new Runnable() {
+                public void run() {
+                    sendPostRequest(); // Call method to send the POST request
+                }
+            });
+            postThread.start(); // Start the thread
+        }
+    }
+
+    public void onComment(String comment) throws Exception{
+        log.info(comment);
+    }
+
+    public void onError(Throwable t){
+        log.info("Error "+t);
+    }
+
+    // Method to send the POST request
+    private void sendPostRequest() {
+        // Implement your logic to send a POST request with headers, body, and token
+        // Example:
+        /*
+        HttpURLConnection connection = null;
+        try {
+            URL url = new URL("YOUR_POST_URL_HERE");
+            connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setRequestProperty("Content-Type", "application/json");
+            connection.setRequestProperty("Authorization", "Bearer YOUR_TOKEN_HERE");
+
+            // Set the request body if needed
+            String requestBody = "{\"key\":\"value\"}";
+            connection.setDoOutput(true);
+            connection.getOutputStream().write(requestBody.getBytes(StandardCharsets.UTF_8));
+
+            int responseCode = connection.getResponseCode();
+            // Handle response code and any response if needed
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+        */
+    }
+}
+
+// Create an instance of SimpleEventHandler with the logger
+SimpleEventHandler eH = new SimpleEventHandler(org.slf4j.LoggerFactory.getLogger(SimpleEventHandler.class));
+
+// Rest of your code remains the same
+EventSource.Builder.ClientConfigurer configure = new EventSource.Builder.ClientConfigurer() {
+    @Override
+    public void configure(OkHttpClient.Builder builder) {
+        builder.retryOnConnectionFailure(false);
+    }
+};
+
+String url = "YOUR_SSE_ENDPOINT_URL_HERE";
+EventSource.Builder builder = new EventSource.Builder(eH, URI.create(url));
+
+EventSource eventSource = builder.connectTimeout(Duration.ofSeconds(10)).clientBuilderActions(configure).connectionErrorHandler(new ConnectionErrorHandler() {
+    @Override
+    public Action onConnectionError(Throwable t) {
+        return ConnectionErrorHandler.Action.SHUTDOWN;
+    }
+}).build();
+
+eventSource.start();
+
+while (eventSource.getState().name().equalsIgnoreCase(ReadyState.OPEN.name()) ||
+        eventSource.getState().name().equalsIgnoreCase(ReadyState.CONNECTING.name())) {
+    try {
+        Thread.sleep(100);
+    } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+    }
+}
