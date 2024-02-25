@@ -1,0 +1,28 @@
+import org.apache.jmeter.control.WhileController
+import org.apache.jmeter.engine.StandardJMeterEngine
+import org.apache.jmeter.testelement.TestPlan
+import org.apache.jmeter.testelement.TestElement
+import org.apache.jmeter.threads.JMeterContextService
+
+// Get the current Thread Group
+def threadGroup = ctx.getThreadGroup()
+
+// Find the Test Plan
+def testPlan = ctx.getEngine().getTestPlan()
+
+// Find the Parallel Controller within the Test Plan
+def parallelController = testPlan.getSubControllers().find { it -> it.getName() == "Parallel Controller" }
+
+if(parallelController != null) {
+    // Find the While Controller within the Parallel Controller
+    def whileController = parallelController.getSubControllers().find { it instanceof WhileController }
+
+    if(whileController != null) {
+        // Start the While Controller's loop
+        whileController.startNextLoop(true)
+    } else {
+        log.error("While Controller not found within Parallel Controller")
+    }
+} else {
+    log.error("Parallel Controller not found within Test Plan")
+}
