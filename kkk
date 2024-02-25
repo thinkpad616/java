@@ -1,0 +1,71 @@
+import com.launchdarkly.eventsource.EventSource;
+import com.launchdarkly.eventsource.ConnectionErrorHandler;
+import com.launchdarkly.eventsource.EventHandler;
+import com.launchdarkly.eventsource.MessageEvent;
+import okhttp3.OkHttpClient;
+import com.launchdarkly.eventsource.ReadyState;
+import java.net.URI;
+import java.io.StringReader;
+import java.util.concurrent.TimeUnit;
+import java.util.ArrayList;
+import java.time.Duration;
+import java.nio.charset.StandardCharsets;
+import java.net.*;
+import com.launchdarkly.eventsource.ConnectionErrorHandler.Action;
+
+public class SimpleEventHandler implements EventHandler {
+ public SimpleEventHandler(org.slf4j.Logger log){
+  this.log=log;
+ } 
+ def org.slf4j.Logger log;   
+ public List<String> respList = new ArrayList<String>(); 
+ public void onOpen() throws Exception{
+  log.info("SSE Connection Opened");
+ }
+ public void onClosed() throws Exception{
+  log.info("SSE Connection Closed");
+ }
+ public void onMessage(String Event, MessageEvent messageEvent) throws Exception{
+  respList.add(messageEvent.getData());
+  log.info("Received: "+ messageEvent.getData() );
+ } 
+ public void onComment(String comment) throws Exception{
+  log.info(comment);
+ } 
+ public void onError(Throwable t){
+  log.info("Error "+t);
+ }
+}
+
+EventHandler eH = new SimpleEventHandler(log);
+ eH.log=log;
+ String responseList="";
+
+     EventSource.Builder.ClientConfigurer configure = new EventSource.Builder.ClientConfigurer() {
+            @Override
+            public void configure(OkHttpClient.Builder builder) {
+                builder.retryOnConnectionFailure(false);
+            }
+     };
+
+EventSource.Builder builder = new EventSource.Builder(eH, URI.create(url));
+
+ vars.put("counter","1");
+
+     EventSource eventSource = builder.connectTimeout(Duration.ofSeconds(Integer.parseInt("10"))).clientBuilderActions(configure).connectionErrorHandler(new ConnectionErrorHandler() {
+            @Override
+            public Action onConnectionError(Throwable t) {
+                return ConnectionErrorHandler.Action.SHUTDOWN;
+            }
+     }).build();
+
+ eventSource.start();
+
+ while (eventSource.getState().name().equalsIgnoreCase(ReadyState.OPEN.name()) ||
+                eventSource.getState().name().equalsIgnoreCase(ReadyState.CONNECTING.name())) {
+             try {
+                 Thread.sleep(100);
+             } catch (InterruptedException e) {
+                 throw new RuntimeException(e);
+             }
+     }
