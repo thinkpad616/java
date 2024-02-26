@@ -7,7 +7,6 @@ import com.launchdarkly.eventsource.ReadyState;
 import java.net.URI;
 import java.io.StringReader;
 import java.util.concurrent.TimeUnit;
-import java.util.ArrayList;
 import java.time.Duration;
 import java.nio.charset.StandardCharsets;
 import java.net.*;
@@ -18,17 +17,17 @@ import java.util.UUID;
 public class SimpleEventHandler implements EventHandler {
     private Logger log;
     private String taskId;
-    private long lastEventTime = System.currentTimeMillis(); // Variable to store the time of the last event received
     private long postInterval; // Time interval (in milliseconds) after which to send the POST request
+    private int eventCount = 0; // Count of events received within the 2-minute window
+    private long windowStartTime; // Start time of the 2-minute window
 
     // Constructor with configurable postInterval
     public SimpleEventHandler(Logger log, String taskId, long postInterval){
         this.log = log;
         this.taskId = taskId;
         this.postInterval = postInterval;
+        this.windowStartTime = System.currentTimeMillis();
     }
-
-    public List<String> respList = new ArrayList<String>();
 
     public void onOpen() throws Exception{
         log.info("SSE Connection Opened");
@@ -39,20 +38,22 @@ public class SimpleEventHandler implements EventHandler {
     }
 
     public void onMessage(String Event, MessageEvent messageEvent) throws Exception{
-        // Log the time when each ping is generated
+        // Log the time when each event is received in seconds
         long currentTime = System.currentTimeMillis();
-        log.info("Ping generated at: " + currentTime);
+        log.info("Received: "+ messageEvent.getData() + " at " + currentTime);
 
-        // Update the time of the last event received
-        lastEventTime = currentTime;
+        // Increment event count
+        eventCount++;
 
-        // Process the message event
-        respList.add(messageEvent.getData());
-        log.info("Received: "+ messageEvent.getData());
-
-        // Check if it's time to send a POST request
-        if (currentTime - lastEventTime >= postInterval) {
-            sendPostRequest(taskId); // Send POST request if the specified time interval has elapsed
+        // Check if 2 minutes have elapsed since the start of the window
+        if (currentTime - windowStartTime >= 2 * 60 * 1000) {
+            // If 2 minutes have elapsed, check if the event count is greater than 5
+            if (eventCount > 5) {
+                sendPostRequest(taskId); // Send POST request if event count is greater than 5
+            }
+            // Reset event count and window start time for the next 2-minute window
+            eventCount = 0;
+            windowStartTime = currentTime;
         }
     }
 
