@@ -1,0 +1,142 @@
+import com.launchdarkly.eventsource.EventSource;
+import com.launchdarkly.eventsource.ConnectionErrorHandler;
+import com.launchdarkly.eventsource.EventHandler;
+import com.launchdarkly.eventsource.MessageEvent;
+import okhttp3.OkHttpClient;
+import com.launchdarkly.eventsource.ReadyState;
+import java.net.URI;
+import java.io.StringReader;
+import java.util.concurrent.TimeUnit;
+import java.util.ArrayList;
+import java.time.Duration;
+import java.nio.charset.StandardCharsets;
+import java.net.*;
+import com.launchdarkly.eventsource.ConnectionErrorHandler.Action;
+import org.slf4j.Logger;
+import java.util.UUID;
+
+public class SimpleEventHandler implements EventHandler {
+    private Logger log;
+    private String taskId;
+    private long lastEventTime = System.currentTimeMillis(); // Variable to store the time of the last event received
+    private long postInterval = 2 * 60 * 1000; // Time interval (in milliseconds) after which to send the POST request
+
+    public SimpleEventHandler(Logger log, String taskId){
+        this.log = log;
+        this.taskId = taskId;
+    }
+
+    public List<String> respList = new ArrayList<String>();
+
+    public void onOpen() throws Exception{
+        log.info("SSE Connection Opened");
+    }
+
+    public void onClosed() throws Exception{
+        log.info("SSE Connection Closed");
+    }
+
+    public void onMessage(String Event, MessageEvent messageEvent) throws Exception{
+        respList.add(messageEvent.getData());
+        log.info("Received: "+ messageEvent.getData());
+
+        // Update the time of the last event received
+        lastEventTime = System.currentTimeMillis();
+
+        // Check if it's time to send a POST request
+        if (System.currentTimeMillis() - lastEventTime >= postInterval) {
+            sendPostRequest(taskId); // Send POST request if the specified time interval has elapsed
+        }
+    }
+
+    public void onComment(String comment) throws Exception{
+        log.info(comment);
+    }
+
+    public void onError(Throwable t){
+        log.info("Error "+t);
+    }
+
+    // Method to generate a random UUID
+    private String generateRandomUUID() {
+        UUID uuid = UUID.randomUUID();
+        return uuid.toString();
+    }
+
+    // Method to send the POST request
+    private void sendPostRequest(String taskId) {
+        try {
+            // Create the URL object for the POST request
+            URL postUrl = new URL("YOUR_POST_URL_HERE");
+
+            // Open the connection
+            HttpURLConnection connection = (HttpURLConnection) postUrl.openConnection();
+
+            // Set the request method
+            connection.setRequestMethod("POST");
+
+            // Set the request headers
+            connection.setRequestProperty("Content-Type", "application/json");
+            connection.setRequestProperty("Authorization", "Bearer YOUR_TOKEN_HERE");
+
+            // Set the request body with the taskId
+            String requestBody = "{\"taskId\":\"" + taskId + "\"}"; // Include the taskId in the request body
+            connection.setDoOutput(true);
+            connection.getOutputStream().write(requestBody.getBytes(StandardCharsets.UTF_8));
+
+            // Get the response code
+            int responseCode = connection.getResponseCode();
+            log.info("POST Response Code: " + responseCode);
+
+            // Get the response body if available
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                InputStream inputStream = connection.getInputStream();
+                BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+                StringBuilder response = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    response.append(line);
+                }
+                reader.close();
+                log.info("POST Response Body: " + response.toString());
+            } else {
+                log.info("POST Request Failed with Response Code: " + responseCode);
+            }
+
+            // Disconnect the connection
+            connection.disconnect();
+        } catch (Exception e) {
+            log.error("Error occurred while sending POST request: " + e.getMessage());
+        }
+    }
+}
+
+EventSource.Builder.ClientConfigurer configure = new EventSource.Builder.ClientConfigurer() {
+    @Override
+    public void configure(OkHttpClient.Builder builder) {
+        builder.retryOnConnectionFailure(false);
+    }
+};
+
+String url = "YOUR_SSE_ENDPOINT_URL_HERE";
+SimpleEventHandler eH = new SimpleEventHandler(org.slf4j.LoggerFactory.getLogger(SimpleEventHandler.class), generateRandomUUID());
+
+EventSource.Builder builder = new EventSource.Builder(eH, URI.create(url));
+
+EventSource eventSource = builder.connectTimeout(Duration.ofSeconds(10)).clientBuilderActions(configure).connectionErrorHandler(new ConnectionErrorHandler() {
+    @Override
+    public Action onConnectionError(Throwable t) {
+        return ConnectionErrorHandler.Action.SHUTDOWN;
+    }
+}).build();
+
+eventSource.start();
+
+while (eventSource.getState().name().equalsIgnoreCase(ReadyState.OPEN.name()) ||
+        eventSource.getState().name().equalsIgnoreCase(ReadyState.CONNECTING.name())) {
+    try {
+        Thread.sleep(100);
+    } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+    }
+}
