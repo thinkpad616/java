@@ -1,0 +1,31 @@
+To configure a Stepping Thread Group in JMeter to achieve 5 transactions per second (TPS) for every 5 minutes while monitoring CPU usage, you can follow these steps:
+
+1. **Configure Stepping Thread Group:**
+   - Right-click on the Test Plan.
+   - Add -> Threads (Users) -> Stepping Thread Group.
+   - Configure the following settings:
+     - Number of Threads (users): Start with 1 thread.
+     - Initial Delay: Set to 300 seconds (5 minutes).
+     - Start Threads Count: 1
+     - Start Threads Time: 0
+     - Stop Threads Count: 1
+     - Stop Threads Time: 0
+     - Flight Time: 1
+     - Ramp-up Time: 0
+     - Hold Load For: 300 seconds (5 minutes)
+     - Target Throughput (TPS): 5
+     - Scheduler: Select "Scheduler" and set the Duration to 300 seconds (5 minutes).
+
+2. **Add Sampler(s):**
+   - Add the required sampler(s) to the Thread Group (e.g., HTTP Request sampler for POST requests).
+   
+3. **Monitor CPU Usage:**
+   - Configure JMeter to monitor CPU usage using a third-party plugin like PerfMon or using command-line tools like jstat.
+   - Set up CPU monitoring to check if the CPU usage exceeds 60% during the test execution.
+
+4. **Run the Test:**
+   - Save your Test Plan.
+   - Start the test execution.
+   - Monitor the CPU usage during the test to ensure it reaches the desired threshold.
+
+By configuring the Stepping Thread Group with the specified settings and adding the necessary samplers, you can achieve 5 TPS for every 5 minutes while monitoring the CPU usage. Adjust the settings as needed based on your specific requirements and environment.
