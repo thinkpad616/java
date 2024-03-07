@@ -1,0 +1,51 @@
+import org.apache.hc.client5.http.classic.HttpClient;
+import org.apache.hc.client5.http.classic.HttpClientBuilder;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.core5.ssl.SSLContextBuilder;
+import org.apache.hc.core5.ssl.TrustStrategy;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
+
+import java.io.IOException;
+import java.security.KeyManagementException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+
+public class MyHttpClientExample {
+    public static void main(String[] args) {
+        try {
+            HttpClientBuilder httpClientBuilder = HttpClientBuilder.create();
+            
+            // Define SSL context with custom verifier
+            TrustStrategy trustStrategy = (chain, authType) -> true; // Accept all certificates
+            SSLContextBuilder sslContextBuilder = SSLContextBuilder.create().loadTrustMaterial(trustStrategy);
+            httpClientBuilder.setSSLContext(sslContextBuilder.build());
+            
+            // Set connection timeout, read timeout, and request timeout
+            httpClientBuilder.setConnectionRequestTimeout(5000);
+            httpClientBuilder.setConnectTimeout(5000);
+            httpClientBuilder.setResponseTimeout(5000);
+            
+            // Build HttpClient
+            HttpClient httpClient = httpClientBuilder.build();
+            
+            // Create HttpPost instance with URL
+            HttpPost httpPost = new HttpPost("http://example.com");
+            
+            // Execute the request and obtain the response
+            ClassicHttpResponse response = httpClient.execute(httpPost);
+            
+            // Process the response
+            String responseString = EntityUtils.toString(response.getEntity());
+            
+            // Print the response
+            System.out.println("Response: " + responseString);
+            
+            // Close the response
+            response.close();
+        } catch (IOException | KeyStoreException | NoSuchAlgorithmException | KeyManagementException e) {
+            e.printStackTrace();
+        }
+    }
+}
