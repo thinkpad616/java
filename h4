@@ -1,0 +1,46 @@
+// Imports for HttpClient 4
+import org.apache.http.client.HttpClientBuilder;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import org.apache.http.conn.ssl.TrustStrategy; // Interface for custom SSL trust strategy (if needed)
+import org.apache.http.impl.client.HttpComponentsClientHttpRequestFactory;
+import org.springframework.web.client.RestTemplate;
+
+// Utility class for endpoint properties (assumed)
+public class MyUtil {
+    public static EndpointProperties getEnpointProperties(String endpointName) {
+        // Implement logic to retrieve endpoint properties
+    }
+}
+
+public class MyService {
+
+    private static final TrustStrategy VERIFIER = ...; // Custom SSL trust strategy implementation (if needed)
+
+    public AuthenticationServiceResponse sendLoginRequest(String username, String password) throws IOException {
+        // 1. Create HttpClientBuilder for configuring the HTTP client
+        HttpClientBuilder httpClientBuilder = HttpClientBuilder.create();
+
+        // 2. Set custom SSL hostname verifier (optional, use VERIFIER if needed)
+        httpClientBuilder.setSSLHostnameVerifier(VERIFIER);
+
+        // 3. Create HttpComponentsClientHttpRequestFactory using the built HttpClient
+        HttpComponentsClientHttpRequestFactory clientHttpReqFactory = new HttpComponentsClientHttpRequestFactory(httpClientBuilder.build());
+
+        // 4. Retrieve endpoint properties (assumed logic in MyUtil)
+        EndpointProperties properties = MyUtil.getEnpointProperties("customers-logins-failover");
+
+        // 5. Set timeouts based on endpoint properties
+        clientHttpReqFactory.setConnectionRequestTimeout(properties.getRequestTimeout());
+        clientHttpReqFactory.setConnectTimeout(properties.getConnectTimeout());
+        clientHttpReqFactory.setReadTimeout(properties.getRequestTimeout());
+
+        // 6. Create RestTemplate using the configured HttpComponentsClientHttpRequestFactory
+        RestTemplate restTemplate = new RestTemplate(clientHttpReqFactory);
+
+        // 7. Build the request entity (assumed logic for username and password)
+        HttpEntity<String> requestEntity = new HttpEntity<String>(...);
+
+        // 8. Execute the POST request and return the deserialized response
+        return restTemplate.exchange(properties.getUrl(), HttpMethod.POST, requestEntity, AuthenticationServiceResponse.class);
+    }
+}
