@@ -1,0 +1,62 @@
+import org.apache.hc.client5.http.classic.HttpClient;
+import org.apache.hc.client5.http.classic.HttpClientBuilder;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.apache.hc.core5.ssl.SSLContextBuilder;
+import org.apache.hc.core5.ssl.SSLContexts;
+import org.apache.hc.core5.ssl.TrustStrategy;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.client5.http.HttpResponseException;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
+import org.springframework.web.client.RestTemplate;
+
+import java.io.IOException;
+import java.security.GeneralSecurityException;
+
+public class MyHttpClientExample {
+    public static void main(String[] args) {
+        try {
+            // Trust all certificates (for testing purposes only)
+            TrustStrategy trustStrategy = (chain, authType) -> true;
+
+            // Create SSL context
+            SSLContext sslContext = SSLContexts.custom()
+                    .loadTrustMaterial(trustStrategy)
+                    .build();
+
+            // Create HttpClient with custom SSL context
+            CloseableHttpClient httpClient = HttpClients.custom()
+                    .setSSLContext(sslContext)
+                    .build();
+
+            // Create RestTemplate with custom request factory
+            HttpComponentsClientHttpRequestFactory requestFactory = new HttpComponentsClientHttpRequestFactory(httpClient);
+            RestTemplate restTemplate = new RestTemplate(requestFactory);
+
+            // Get endpoint properties
+            EndpointProperties properties = util.getEnpointProperties("customers-logins-failover");
+
+            // Set connection request timeout, connect timeout, and read timeout
+            requestFactory.setConnectionRequestTimeout(properties.getRequestTimeout());
+            requestFactory.setConnectTimeout(properties.getConnectTimeout());
+            requestFactory.setReadTimeout(properties.getRequestTimeout());
+
+            // Execute the request using RestTemplate
+            ResponseEntity<AuthenticationServiceResponse> responseEntity = restTemplate.exchange(properties.getUrl(), HttpMethod.POST, requestEntity, AuthenticationServiceResponse.class);
+
+            // Get the response body
+            AuthenticationServiceResponse responseBody = responseEntity.getBody();
+
+            // Print the response
+            System.out.println("Response: " + responseBody);
+
+        } catch (IOException | GeneralSecurityException | HttpResponseException e) {
+            e.printStackTrace();
+        }
+    }
+}
