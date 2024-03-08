@@ -1,0 +1,60 @@
+import org.apache.hc.client5.http.classic.HttpClient;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.entity.StringEntity;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactory;
+import org.apache.hc.client5.http.ssl.TrustStrategy; // Interface for custom SSL trust strategy (if needed)
+import org.apache.hc.core5.http.HttpStatus;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.ssl.SSLContexts;
+
+public class MyService {
+
+    private static final TrustStrategy VERIFIER = ...; // Custom SSL trust strategy implementation (if needed)
+
+    public AuthenticationServiceResponse sendLoginRequest(String username, String password) throws IOException {
+        // 1. Create HttpClient configuration with optional SSL context
+        try (CloseableHttpClient httpClient = createHttpClient()) {
+            // 2. Build the POST request
+            HttpPost httpPost = new HttpPost(MyUtil.getEnpointProperties("customers-logins-failover").getUrl());
+
+            // 3. Set request entity with username and password (assumed logic)
+            StringEntity requestEntity = new StringEntity(prepareRequestBody(username, password), "UTF-8"); // Specify encoding
+            httpPost.setEntity(requestEntity);
+
+            // 4. Execute the request and handle response
+            try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
+                // 5. Check for successful response status
+                if (response.getCode() == HttpStatus.SC_OK) {
+                    // 6. Parse response entity as AuthenticationServiceResponse
+                    return EntityUtils.toObject(response.getEntity(), AuthenticationServiceResponse.class);
+                } else {
+                    // Handle unsuccessful response (throw specific exception or log error)
+                    throw new LoginException("Login request failed with status code: " + response.getCode()); // Consider a custom exception
+                }
+            }
+        }
+    }
+
+    private String prepareRequestBody(String username, String password) {
+        // Implement logic to create request body with username and password (e.g., JSON)
+        // You can use libraries like Jackson or Gson for JSON serialization
+        // ...
+    }
+
+    private static CloseableHttpClient createHttpClient() throws SSLException {
+        // SSL configuration (replace with appropriate strategy)
+        SSLContext sslcontext = SSLContexts.custom().loadTrustMaterial(null, VERIFIER != null ? VERIFIER : TrustAllStrategy.INSTANCE).build();
+        SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(sslcontext);
+
+        // Connection manager configuration
+        PoolingHttpClientConnectionManager connManager = PoolingHttpClientConnectionManagerBuilder.create()
+                .setSSLSocketFactory(sslsf)
+                .build();
+
+        return HttpClients.custom()
+                .setConnectionManager(connManager)
+                .build();
+    }
+}
