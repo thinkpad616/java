@@ -1,0 +1,33 @@
+import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
+import org.springframework.web.reactive.function.client.WebClient;
+import static org.mockito.Mockito.*;
+
+public class MyServiceTest {
+
+    @Mock
+    WebClient webClientMock;
+
+    @Test
+    public void testPostData() {
+        // Mock WebClient behavior
+        when(webClientMock.post()).thenReturn(mock(WebClient.RequestHeadersUriSpec.class));
+        when(webClientMock.post().uri("/api/data")).thenReturn(mock(WebClient.RequestHeadersSpec.class));
+        when(webClientMock.post().uri("/api/data").bodyValue(anyString())).thenReturn(mock(WebClient.RequestBodySpec.class));
+        when(webClientMock.post().uri("/api/data").bodyValue(anyString()).retrieve()).thenReturn(mock(WebClient.ResponseSpec.class));
+        when(webClientMock.post().uri("/api/data").bodyValue(anyString()).retrieve().bodyToMono(String.class)).thenReturn(mock(WebClient.ResponseSpec.class));
+
+        // Initialize MyService with the mocked WebClient
+        MyService myService = new MyService(webClientMock);
+
+        // Test postData method
+        myService.postData("test data");
+
+        // Verify that WebClient methods are called as expected
+        verify(webClientMock).post();
+        verify(webClientMock.post().uri("/api/data"));
+        verify(webClientMock.post().uri("/api/data").bodyValue("test data"));
+        verify(webClientMock.post().uri("/api/data").bodyValue("test data").retrieve());
+        verify(webClientMock.post().uri("/api/data").bodyValue("test data").retrieve().bodyToMono(String.class));
+    }
+}
