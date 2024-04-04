@@ -1,0 +1,75 @@
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.SecretKeySpec;
+import java.security.spec.KeySpec;
+import java.security.SecureRandom;
+import java.util.Base64;
+
+public class AESEncryption {
+    public static byte[] encrypt(String password, byte[] data) throws Exception {
+        // Generate a random salt
+        byte[] salt = new byte[16];
+        SecureRandom random = new SecureRandom();
+        random.nextBytes(salt);
+
+        // Derive key from password and salt
+        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+        KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 100000, 128);
+        SecretKey tmp = factory.generateSecret(spec);
+        SecretKeySpec secretKey = new SecretKeySpec(tmp.getEncoded(), "AES");
+
+        // Generate random IV
+        byte[] iv = new byte[16];
+        random.nextBytes(iv);
+        IvParameterSpec ivParameterSpec = new IvParameterSpec(iv);
+
+        // Encrypt the data
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey, ivParameterSpec);
+        byte[] encryptedData = cipher.doFinal(data);
+
+        // Concatenate salt and IV with the encrypted data
+        byte[] combined = new byte[salt.length + iv.length + encryptedData.length];
+        System.arraycopy(salt, 0, combined, 0, salt.length);
+        System.arraycopy(iv, 0, combined, salt.length, iv.length);
+        System.arraycopy(encryptedData, 0, combined, salt.length + iv.length, encryptedData.length);
+
+        return combined;
+    }
+
+    public static byte[] decrypt(String password, byte[] encryptedData) throws Exception {
+        // Extract salt, IV, and encrypted data
+        byte[] salt = new byte[16];
+        byte[] iv = new byte[16];
+        byte[] data = new byte[encryptedData.length - 32]; // 16 for salt + 16 for IV
+
+        System.arraycopy(encryptedData, 0, salt, 0, 16);
+        System.arraycopy(encryptedData, 16, iv, 0, 16);
+        System.arraycopy(encryptedData, 32, data, 0, encryptedData.length - 32);
+
+        // Derive key from password and salt
+        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+        KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 100000, 128);
+        SecretKey tmp = factory.generateSecret(spec);
+        SecretKeySpec secretKey = new SecretKeySpec(tmp.getEncoded(), "AES");
+
+        // Decrypt the data
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.DECRYPT_MODE, secretKey, new IvParameterSpec(iv));
+        return cipher.doFinal(data);
+    }
+
+    public static void main(String[] args) throws Exception {
+        String password = "supersecret";
+        byte[] data = "Hello, world!".getBytes();
+
+        byte[] encryptedData = encrypt(password, data);
+        System.out.println("Encrypted data: " + Base64.getEncoder().encodeToString(encryptedData));
+
+        byte[] decryptedData = decrypt(password, encryptedData);
+        System.out.println("Decrypted data: " + new String(decryptedData));
+    }
+}
